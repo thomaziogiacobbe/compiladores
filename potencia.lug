@@ -1,0 +1,29 @@
+main {
+    var int n;
+    var int exp;
+    var int resultado;
+    n := 5;
+    exp := 3;
+    resultado := potencia(5,3);
+    print(resultado);
+}
+
+function int potencia(int n, int exp) {
+    var int result;
+    result := 1;
+    if ((exp == 0)) {
+        return 1;
+    };
+    if ((exp == 1)) {
+        return n;
+    };
+    if ((n == 0)) {
+        return 0;
+    };
+    while ((exp > 0))
+    do {
+        result := (result * n);
+        exp := (exp - 1);
+    };
+    return result;
+}

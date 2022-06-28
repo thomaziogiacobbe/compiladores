@@ -1,0 +1,28 @@
+main {
+    var int a; 
+    var int b; 
+    var int c;
+    var bool triangulo;
+
+    a := 2;
+    b := 3;
+    c := 3;
+    triangulo := checkTriangulo(a,b,c);
+    if ((triangulo == true)) {
+        print(true);
+    };
+    if((triangulo == false)) {
+        print(false);
+    };
+}
+
+function bool checkTriangulo (int a, int b, int c) {
+    if (((a + b) > c)) {
+        if (((a + c) > b)) {
+            if (((b + c) > a)) {
+                return true;
+            };
+        };
+    };
+    return false;
+}

@@ -1,0 +1,636 @@
+PARSER_BEGIN(LugosiCompiler)
+
+import java.io.*;
+import java.util.*;
+
+class LugosiArvore {
+
+    Main main;
+    ArrayList<Function> functions;
+
+    LugosiArvore(Main m, ArrayList<Function> f) {
+        main = m;
+        functions = f;
+    }
+}
+
+class Main{
+	ArrayList <VarDecl> vars;
+	ArrayList <Command> Command;
+
+    Main(ArrayList<VarDecl> varlist, ArrayList<Command> comm){
+        vars = varlist;
+        Command = comm;
+    }
+}
+
+class Command{}
+
+class CommandSeq {
+    ArrayList <Command> Command;
+
+    CommandSeq(ArrayList<Command> c) {
+        this.Command = c;
+    }
+}
+
+class VarDecl {
+    String dtype;
+    String var;
+
+    VarDecl(Token id, String t) {
+        dtype = t;
+        var = id.image;
+    }
+}
+
+class Atrib extends Command {
+
+    String id;
+    Exp exp;
+
+    Atrib(Token id, Exp e) {
+        this.id = id.image;
+        exp = e;
+    }
+}
+
+class FunctionCall extends Command {
+    String name;
+    ArrayList<Exp> args;
+
+    FunctionCall(String n, ArrayList<Exp> a) {
+        name = n;
+        args = a;
+    }
+}
+
+class If extends Command {
+    Exp exp;
+    ArrayList<Command> Command;
+
+    If(Exp e, ArrayList<Command> c) {
+        exp = e;
+        Command = c;
+    }
+}
+
+class While extends Command {
+    Exp exp;
+    ArrayList<Command> Command;
+
+    While(Exp e, ArrayList<Command> c) {
+        exp = e;
+        Command = c;
+    }
+}
+
+class DoWhile extends Command {
+    Exp exp;
+    ArrayList<Command> Command;
+
+    DoWhile(Exp e, ArrayList<Command> c) {
+        exp = e;
+        Command = c;
+    }
+}
+
+class Return extends Command {
+    Exp exp;
+
+    Return(Exp e) {
+        exp = e;
+    }
+}
+
+class Print extends Command {
+    Exp exp;
+
+    Print(Exp e){
+        exp = e;
+    }
+}
+
+class Exp{}
+
+class Operator extends Exp {
+    Exp arg1, arg2;
+    String op;
+
+    Operator(Exp arg1, Exp arg2, String op) {
+        this.arg1 = arg1;
+        this.arg2 = arg2;
+        this.op = op;
+    }
+}
+
+class Fator extends Exp{}
+
+class TokenId extends Fator {
+    String id;
+
+    TokenId(String id) {
+        this.id = id;
+    }
+}
+
+class TokenIdList extends Fator {
+    String id;
+    ArrayList<Exp> exps;
+
+    TokenIdList(String id, ArrayList<Exp> e) {
+        this.id = id;
+        exps = e;
+    }
+}
+
+class NumLiteral extends Fator {
+    String num;
+
+    NumLiteral(String n) {
+        num = n;
+    }
+}
+
+class Type extends Fator {
+    String dtype;
+
+    Type(String t) {
+        dtype = t;
+    }
+}
+
+class ListExp {
+    Exp exp;
+
+    ListExp(Exp e) {
+        exp = e;
+    }
+}
+
+class ListArgs {
+    String dtype;
+    String id;
+
+    ListArgs(String t, Token id) {
+        dtype = t;
+        this.id = id.image;
+    }
+}
+
+class Function {
+    String id;
+    String dtype;
+    ArrayList<ListArgs> args;
+    ArrayList<VarDecl> vars;
+    ArrayList<Command> Command;
+
+    Function(Token id, String t, ArrayList<ListArgs> a, ArrayList<VarDecl> v, ArrayList<Command> c) {
+        this.id = id.image;
+        dtype = t;
+        args = a;
+        vars = v;
+        Command = c;
+    }
+}
+
+
+public class LugosiCompiler {
+    public static void main(String[] args) throws ParseException, IOException {
+        LugosiCompiler parser = new LugosiCompiler(new FileInputStream(args[0]));
+        LugosiArvore lug = parser.Lugosi();
+        printer(lug, args[0]);
+  }
+
+public static void printer(LugosiArvore lug, String file) {
+    String name = file.split("\\.")[0];
+    name = Character.toUpperCase(name.charAt(0)) + name.substring(1);
+    File f = new File(name + ".java");
+
+    try {
+        f.createNewFile();
+        FileWriter fw = new FileWriter(f, false);
+        BufferedWriter bw = new BufferedWriter(fw);
+
+        bw.write("public class " + name + "{");
+        bw.write("public static void main(String[] args){ ");
+        bw.write(printMain(lug.main));
+        bw.write(" } ");
+        bw.write(printFunctions(lug.functions));
+        bw.write(" } ");
+
+        bw.close();
+        fw.close();
+    } catch(IOException e) {
+        System.out.println("Erro de arquivo: " + e);
+    }
+
+}
+
+public static String printFunctions(ArrayList<Function> functions){
+        String ret = "";
+        for (Function f: functions) {
+            int count = 0;
+            ret += (" static " + f.dtype + " " + f.id + "(");
+            for(ListArgs la : f.args) {
+                ret += (la.dtype + " " + la.id);
+                if(f.args.size() > 1 && (count < (f.args.size() - 1))) {
+                    ret += ", ";
+                }
+                count += 1;
+            }
+            ret += ("){");
+            for(VarDecl v : f.vars) {
+                ret += (v.dtype + " " + v.var + "; ");
+            }
+
+            for(Command c : f.Command) {
+                ret += printCommand(c);
+            }
+            ret += "}";
+        }
+        return ret;
+}
+
+public static String printMain(Main main) {
+    String ret = "";
+    for (VarDecl v: main.vars) {
+        ret += (v.dtype + " " + v.var + ";\n");
+    }
+    ret += printCommand(main.Command);
+    return ret;
+}
+
+public static String printCommand(Command c) {
+    String ret = "";
+
+    if (c instanceof Atrib){
+        ret += printAtrib((Atrib) c);
+    }
+    else if (c instanceof FunctionCall){
+        ret += printFunctionCall((FunctionCall) c);
+    }
+    else if (c instanceof If){
+        ret += printIf((If) c);
+    }
+    else if (c instanceof While){
+        ret += printWhile((While) c);
+    }
+    else if (c instanceof DoWhile){
+        ret += printDoWhile((DoWhile) c);
+    }
+    else if (c instanceof Return){
+        ret += printReturn((Return) c);
+    }
+    else if (c instanceof Print){
+        ret += printPrint((Print) c);
+    }
+    return ret;
+}
+
+public static String printNR(Object e) {
+    String ret = "";
+
+    if(e instanceof Exp) {
+        ret += ("= " + printExp((Exp) e) + ";");
+    } else if (e instanceof ArrayList) {
+        ret += " (";
+        ArrayList<Exp> exps = (ArrayList<Exp>) e;
+        int count = 0;
+        for (Exp ex : exps) {
+            ret += printExp(ex);
+            if (exps.size() > 1 && (count < (exps.size() - 1))) {
+                ret += ", ";
+            }
+            count += 1;
+        }
+        ret += ");\n";
+    }
+    return ret;
+}
+
+public static String printAtrib(Atrib a) {
+    String ret = "";
+
+    ret += (a.id + " ");
+    ret += printNR(a.exp);
+    return ret + "\n";
+}
+
+public static String printFunctionCall(FunctionCall fc) {
+    String ret = "";
+
+    ret += (fc.name + "(");
+    ret += printNR(fc.args);
+    return ret;
+}
+
+public static String printIf(If i) {
+     String ret = "";
+
+     ret += ("if (" + printExp(i.exp) + ") { ");
+     ret += printCommand(i.Command);
+     ret += ("}");
+     return ret;
+}
+
+public static String printWhile(While w) {
+    String ret = "";
+
+    ret += ("while (" + printExp(w.exp) + ") { ");
+    ret += printCommand(w.Command);
+    ret += "}";
+    return ret;
+}
+
+public static String printDoWhile(DoWhile dw) {
+    String ret = "";
+
+    ret += ("do { ");
+    ret += printCommand(dw.Command);
+    ret += "} ";
+    ret += ("while (" + dw.exp + ");");
+    return ret;
+}
+
+public static String printReturn(Return r) {
+    String ret = "";
+
+    ret += ("return " + printExp(r.exp) + ";");
+    return ret;
+}
+
+public static String printPrint(Print p) {
+    String ret = "";
+    ret += "System.out.println(" + printExp(p.exp) + ");";
+    return ret;
+}
+
+public static String printExp(Exp e) {
+    if (e instanceof Fator) {
+        return printFator(e);
+    } else {
+        return printExpOp((Operator) e);
+    }
+}
+
+public static String printFator(Exp e) {
+    if (e instanceof TokenIdList) {
+        return printTokenIdList((TokenIdList) e);
+    } else if (e instanceof NumLiteral) {
+        return printNumLiteral((NumLiteral) e);
+    } else if (e instanceof Type) {
+        return printType((Type) e);
+    } else if (e instanceof TokenId) {
+        return printTokenId((TokenId) e);
+    }
+    return "";
+}
+
+public static String printTokenIdList(TokenIdList tl) {
+    String ret = "";
+
+    ret += (tl.id + "(");
+    int count = 0;
+    for (Exp e : tl.exps) {
+        ret += printFator(e);
+        if (tl.exps.size() > 1 && (count < (tl.exps.size() - 1))) {
+            ret += ", ";
+        }
+        count += 1;
+    }
+    return ret += ") ";
+}
+
+public static String printTokenId(TokenId t) {
+    return t.id + " ";
+}
+
+public static String printNumLiteral(NumLiteral n) {
+    return n.num + " ";
+}
+
+public static String printExpOp(Operator op) {
+    return "(" + printExp(op.arg1) + " " + op.op + " " + printExp(op.arg2) + ")";
+}
+
+public static String printType(Type t) {
+    return t.dtype + " ";
+}
+
+public static String printCommand(ArrayList<Command> Command) {
+    String ret = "";
+
+    for (Command c : Command) {
+        ret += printCommand(c);
+    }
+    return ret;
+}
+
+}
+
+
+
+PARSER_END(LugosiCompiler)
+
+SKIP : {
+    " "
+  | "\t"
+  | "\n"
+  | "\r"
+}
+
+TOKEN : {
+  <MAIN: "main">
+  | <OPENBRACKET: "{">
+  | <CLOSEBRACKET: "}">
+  | <FUNCTION: "function">
+  | <VAR: "var">
+  | <ENDL: ";">
+  | <INT: "int">
+  | <BOOL: "bool">
+  | <ATRIB: ":=">
+  | <OPENPAR: "(">
+  | <CLOSEPAR: ")">
+  | <IF: "if">
+  | <WHILE: "while">
+  | <DO: "do">
+  | <RETURN: "return">
+  | <PRINT: "print">
+  | <TRUE: "true">
+  | <FALSE: "false">
+  | <COMMA: ",">
+  | <VOID: "void">
+  | <FLOAT: "float">
+}
+
+TOKEN :
+{
+  <NUM : (["0"-"9"])+("."(["0"-"9"])+)? ("E"("+" | "-")?(["0"-"9"])+)?>
+  |<OP: "+" | "-" | "*" | "/" | "&&" | "||" | "<" | ">" | "==">
+  |<ID:["a"-"z","A"-"Z"] (["a"-"z","A"-"Z","0"-"9"])* ("_"(["a"-"z","A"-"Z","0"-"9"])+)*>
+}
+
+LugosiArvore Lugosi () :
+{Main main; ArrayList <Function> functions = new ArrayList<Function>();}
+{
+    main = Main()
+    (functions = Func())? <EOF>
+    {return new LugosiArvore(main, functions);}
+}
+
+Main Main () :
+{ArrayList<VarDecl> v; ArrayList<Command> c;}
+{
+    <MAIN> <OPENBRACKET>
+    v = VarDecl()
+    c = CommandSeq()
+    <CLOSEBRACKET>
+    {return new Main(v,c);}
+}
+
+ArrayList<VarDecl> VarDecl () :
+{ArrayList<VarDecl> v = new ArrayList<VarDecl>(); String type; String var; Token id;}
+{
+    (<VAR> type = VarType() id = <ID> <ENDL> {v.add(new VarDecl(id, type));})*
+    {return v;}
+}
+
+String VarType() :
+{Token t;}
+{
+    ( t = <INT>
+    | t = <BOOL> {return "boolean";}
+    | t = <FLOAT>
+    | t = <VOID>)
+    {return t.image;}
+}
+
+ArrayList<Command> CommandSeq() :
+{ArrayList<Command> cl = new ArrayList<Command>(); Command c;}
+{
+    (c = Command() {cl.add(c);})*
+    {return cl;}
+}
+
+Command Command() :
+{Token id; Exp e; Object nr; ArrayList<Command> cs; ArrayList<Exp> exps; Command c;}
+{
+    ((id = <ID>) nr = AtribExp())
+    {if (nr instanceof Exp) return new Atrib(id, (Exp) nr);
+    else return new FunctionCall(id.image, (ArrayList<Exp>) nr);
+    }
+    | c = IfCommand() {return c;}
+    | c = WhileCommand() {return c;}
+    | c = DoCommand() {return c;}
+    | c = ReturnCommand() {return c;}
+    | c = PrintCommand() {return c;}
+}
+
+If IfCommand() :
+{Exp e; ArrayList<Command> cs;}
+{
+    <IF> <OPENPAR> e = Exp() <CLOSEPAR>
+    <OPENBRACKET>
+    cs = CommandSeq()
+    <CLOSEBRACKET> <ENDL>
+    {return new If(e,cs);}
+}
+
+While WhileCommand() :
+{Exp e; ArrayList<Command> cs;}
+{
+    <WHILE> <OPENPAR> e = Exp() <CLOSEPAR>
+    <DO> <OPENBRACKET>
+    cs = CommandSeq()
+    <CLOSEBRACKET> <ENDL>
+    {return new While(e,cs);}
+}
+
+DoWhile DoCommand() :
+{Exp e; ArrayList<Command> cs;}
+{
+    <DO> <OPENBRACKET>
+    cs = CommandSeq()
+    <CLOSEBRACKET>
+    <WHILE> <OPENPAR> e = Exp() <CLOSEPAR> <ENDL>
+    {return new DoWhile(e,cs);}
+}
+
+Return ReturnCommand() :
+{Exp e;}
+{
+    <RETURN> e = Exp() <ENDL>
+    {return new Return(e);}
+}
+
+Print PrintCommand() :
+{Exp e;}
+{
+    <PRINT> <OPENPAR> e = Exp() <CLOSEPAR> <ENDL>
+    {return new Print(e);}
+}
+
+Object AtribExp() :
+{Object e = null;}
+{
+    (<ATRIB> (e = Exp()) <ENDL>)
+    {return e;}
+    | (<OPENPAR> (e = ListExp()) <CLOSEPAR> <ENDL>)
+    {return e;}
+}
+
+Exp Exp() :
+{Exp arg1; Exp arg2; Token op; Fator f;}
+{
+    <OPENPAR> arg1 = Exp() op = <OP> arg2 = Exp() <CLOSEPAR>
+    {return new Operator(arg1,arg2,op.image);}
+    | f = Fator()
+    {return f;}
+}
+
+Fator Fator() :
+{Token id; Token num; Token type; ArrayList<Exp> fnr = new ArrayList<Exp>();}
+{
+    id = <ID> (<OPENPAR> (fnr = ListExp()) <CLOSEPAR> )?
+    {if (fnr.isEmpty()) return new TokenId(id.image);
+    else return new TokenIdList(id.image, fnr);}
+    | num = <NUM>
+    {return new NumLiteral(num.image);}
+    | type = <TRUE>
+    {return new Type(type.image);}
+    | type = <FALSE>
+    {return new Type(type.image);}
+}
+
+ArrayList<Exp> ListExp() :
+{Exp e; Exp ex; ArrayList<Exp> list2 = new ArrayList<Exp>();}
+{
+    e = Exp() (<COMMA> ex = Exp() {list2.add(ex);})*
+    {list2.add(0,e); return list2;}
+}
+
+ArrayList<Function> Func() :
+{ArrayList<Function> f = new ArrayList<Function>(); Token id; String type; ArrayList<ListArgs> args = new ArrayList<ListArgs>(); ArrayList<VarDecl> vars; ArrayList<Command> cs;}
+{
+    <FUNCTION> type = VarType() id = <ID> <OPENPAR> (args = ListArgs())? <CLOSEPAR>
+    <OPENBRACKET>
+    vars = VarDecl()
+    cs = CommandSeq()
+    <CLOSEBRACKET>
+    {f.add(new Function(id,type,args,vars,cs));}
+    {return f;}
+}
+
+ArrayList<ListArgs> ListArgs() :
+{ArrayList<ListArgs> lista = new ArrayList<ListArgs>(); String type1; String type2; Token id1; Token id2;}
+{
+    type1 = VarType() id1 = <ID> (<COMMA> type2 = VarType() id2 = <ID> {lista.add(new ListArgs(type2, id2));})*
+    {lista.add(0, new ListArgs(type1, id1)); return lista;}
+}
+
+
+
+
+
+
